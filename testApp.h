@@ -58,5 +58,6 @@ class testApp : public ofBaseApp{
 		int getQuadrant(ofPoint p);
 		int windowWidth, windowHeight;
 		int blobDetectorWidth, blobDetectorHeight;
+		void setQuadrantState(int quadNum, bool isOn);
 };
 

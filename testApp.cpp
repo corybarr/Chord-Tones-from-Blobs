@@ -20,7 +20,7 @@ void testApp::setup(){
 
 	quadrantWidth = 50;
 	quadrantHeight = 50;
-	minBlobArea = 100;
+	minBlobArea = 200;
 	windowWidth = 10;
 	windowHeight = 10;
 
@@ -28,9 +28,9 @@ void testApp::setup(){
 	int bufferSize		= 512;
 	sampleRate 			= 44100;
 	//phase, phase2, phase3 = 0.0f;
-	phase = 0.0f; phase2 = 0.0f; phase3 = 0.0f;
-	phaseAdder = 0.0f; phaseAdder2 = 0.0f; phaseAdder3 = 0.0f;
-	phaseAdderTarget = 0.0f; phaseAdderTarget2 = 0.0f; phaseAdderTarget3 = 0.0f;
+	phase = 0.0f; phase2 = 0.0f; phase3 = 0.0f; phase4 = 0.0f;
+	phaseAdder = 0.0f; phaseAdder2 = 0.0f; phaseAdder3 = 0.0f; phaseAdder4 = 0.0f;
+	phaseAdderTarget = 0.0f; phaseAdderTarget2 = 0.0f; phaseAdderTarget3 = 0.0f; phaseAdderTarget4 = 0.0f;
 	volume				= 0.1f;
 	bNoise 				= false;
 	lAudio.assign(bufferSize, 0.0);
@@ -39,12 +39,14 @@ void testApp::setup(){
 	rAudio2.assign(bufferSize, 0.0);
 	soundStream.setup(this, 2, 0, sampleRate, bufferSize, 4);
 
-	targetFrequency = 440.f;
+	targetFrequency = 440.0f;
 	phaseAdderTarget = (targetFrequency / (float) sampleRate) * TWO_PI;
 	//pythagorean 5th
 	phaseAdderTarget2 = ((targetFrequency * 1.5f) / (float) sampleRate) * TWO_PI;
 	//pythagorean major third (plus an octave)
 	phaseAdderTarget3 = (((targetFrequency * 2.0f) * (81.0f / 64.0f)) / (float) sampleRate) * TWO_PI;
+	//pythagorean major seventh (plus an octave)
+	phaseAdderTarget4 = (((targetFrequency * 2.0f) * (243.0f / 128.0f)) / (float) sampleRate) * TWO_PI;
 	pan = 0.5f;
 	
 	ofSetFrameRate(60);
@@ -108,12 +110,17 @@ void testApp::draw(){
 	//ofSetHexColor(0xffffff);
 
 	//see which quadrants are on
-	int isQuadOn[4] = {false, false, false, false};
-    for (int i = 0; i < contourFinder.nBlobs; i++) {
-		isQuadOn[getQuadrant(contourFinder.blobs[i].centroid)] = true;
-    }
 	for (int i = 0; i < 4; i++)
-		if (isQuadOn[i]) fillInQuadrant(i);
+		setQuadrantState(i, false);
+    for (int i = 0; i < contourFinder.nBlobs; i++) {
+		int quadNum = getQuadrant(contourFinder.blobs[i].centroid);
+		//isQuadrantOn[getQuadrant(contourFinder.blobs[i].centroid)] = true;
+		setQuadrantState(getQuadrant(contourFinder.blobs[i].centroid), true);
+    }
+	for (int i = 0; i < 4; i++) {
+		bool thing = isQuadrantOn[i]; //DEBUG
+		if (isQuadrantOn[i]) fillInQuadrant(i);
+	}
 
 	//draw each blob individually
     for (int i = 0; i < contourFinder.nBlobs; i++) {
@@ -225,6 +232,7 @@ int testApp::getQuadrant(ofPoint p) {
 void testApp::audioOut(float * output, int bufferSize, int nChannels){
 	float leftScale = 1 - pan;
 	float rightScale = pan;
+	volume = 0.05f;
 
 	// sin (n) seems to have trouble when n is very large, so we
 	// keep phase in the range of 0-TWO_PI like this:
@@ -235,12 +243,26 @@ void testApp::audioOut(float * output, int bufferSize, int nChannels){
 	phaseAdder = 0.95f * phaseAdder + 0.05f * phaseAdderTarget;
 	phaseAdder2 = 0.95f * phaseAdder2 + 0.05f * phaseAdderTarget2;
 	phaseAdder3 = 0.95f * phaseAdder3 + 0.05f * phaseAdderTarget3;
+	phaseAdder4 = 0.95f * phaseAdder4 + 0.05f * phaseAdderTarget4;
 	for (int i = 0; i < bufferSize; i++){
-		phase += phaseAdder; phase2 += phaseAdder2; phase3 += phaseAdder3;
+		phase += phaseAdder; phase2 += phaseAdder2; phase3 += phaseAdder3; phase4 += phaseAdder4;
 		float sample = sin(phase);
 		float sample2 = sin(phase2);
 		float sample3 = sin(phase3);
-		lAudio[i] = output[i*nChannels    ] = sample * volume * leftScale;
-		rAudio[i] = output[i*nChannels + 1] = sample2 * volume * rightScale;
+		float sample4 = sin(phase4);
+
+		float sample_left = 0.0f;
+		float sample_right = 0.0f;
+		if (isQuadrantOn[0]) sample_left += sample;
+		if (isQuadrantOn[1]) sample_left += sample2;
+		if (isQuadrantOn[2]) sample_right += sample3;
+		if (isQuadrantOn[3]) sample_right += sample4;
+
+		lAudio[i] = output[i*nChannels    ] = sample_left * volume * leftScale;
+		rAudio[i] = output[i*nChannels + 1] = sample_right * volume * rightScale;
 	}
+}
+
+void testApp::setQuadrantState(int quadNum, bool isOn) {
+	isQuadrantOn[quadNum] = isOn;
 }
